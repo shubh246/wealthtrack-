@@ -1,52 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WealthTrack AI</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.10.3/Recharts.js"></script>
-    <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { background: #080c14; }
-      #root { min-height: 100vh; }
-      #loading {
-        position: fixed; inset: 0; background: #080c14;
-        display: flex; flex-direction: column;
-        align-items: center; justify-content: center;
-        font-family: sans-serif; color: #f5c842; gap: 16px;
-        font-size: 18px; letter-spacing: 1px;
-      }
-      .spinner {
-        width: 40px; height: 40px; border: 3px solid rgba(245,200,66,0.2);
-        border-top-color: #f5c842; border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-      }
-      @keyframes spin { to { transform: rotate(360deg); } }
-    </style>
-  </head>
-  <body>
-    <div id="loading">
-      <div class="spinner"></div>
-      <div>Loading WealthTrack AI...</div>
-    </div>
-    <div id="root"></div>
-
-    <script>
-      // Make recharts available as module-style imports via global
-      window.__recharts = window.Recharts;
-    </script>
-
-    <script type="text/babel" data-presets="react" data-plugins="transform-modules-umd">
-      // Shim imports to globals
-      const { useState, useEffect, useRef, useCallback, useMemo } = React;
-      const {
-        LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-        AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-        ResponsiveContainer, Legend
-      } = window.Recharts || {};
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>WealthTrack AI</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body,#root{height:100%;background:#080c14}
+    #splash{position:fixed;inset:0;background:#080c14;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:16px;color:#f5c842;
+      font-family:sans-serif;font-size:16px;letter-spacing:2px;z-index:9999}
+    .sp{width:36px;height:36px;border:3px solid rgba(245,200,66,.2);
+      border-top-color:#f5c842;border-radius:50%;animation:sp 0.7s linear infinite}
+    @keyframes sp{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <div id="splash"><div class="sp"></div><div>WEALTHTRACK AI</div></div>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
 // ─── DESIGN SYSTEM ──────────────────────────────────────────────────────────
 const CSS = `
@@ -474,6 +450,154 @@ const CSS = `
   .w-full { width: 100%; }
   .grid-goals { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
 `;
+
+
+// ── PURE CSS/CANVAS CHART REPLACEMENTS (no external deps) ──────────────────
+
+function BarChartSimple({ data, keys, colors, height = 200 }) {
+  if (!data || !data.length) return null;
+  const maxVal = Math.max(...data.flatMap(d => keys.map(k => d[k] || 0)));
+  return (
+    <div style={{ height, display: 'flex', alignItems: 'flex-end', gap: 6, padding: '0 4px' }}>
+      {data.map((d, i) => (
+        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, height: '100%', justifyContent: 'flex-end' }}>
+          <div style={{ width: '100%', display: 'flex', gap: 2, alignItems: 'flex-end', height: height - 24 }}>
+            {keys.map((k, ki) => (
+              <div key={k} style={{
+                flex: 1, borderRadius: '3px 3px 0 0', minHeight: 2,
+                height: `${((d[k] || 0) / maxVal) * 100}%`,
+                background: colors[ki], opacity: 0.9,
+                transition: 'height 0.8s cubic-bezier(0.4,0,0.2,1)',
+              }} title={`${k}: ${d[k]?.toLocaleString()}`} />
+            ))}
+          </div>
+          <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--font-mono)', textAlign: 'center', whiteSpace: 'nowrap' }}>{d.month || d.name || ''}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AreaChartSimple({ data, dataKey, color, height = 180 }) {
+  if (!data || !data.length) return null;
+  const vals = data.map(d => d[dataKey] || 0);
+  const maxVal = Math.max(...vals);
+  const minVal = Math.min(...vals);
+  const range = maxVal - minVal || 1;
+  const w = 500, h = height - 30;
+  const pts = vals.map((v, i) => ({
+    x: (i / (vals.length - 1)) * w,
+    y: h - ((v - minVal) / range) * (h - 10)
+  }));
+  const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const areaD = pathD + ` L${w},${h} L0,${h} Z`;
+  return (
+    <div style={{ height, position: 'relative', overflow: 'hidden' }}>
+      <svg viewBox={`0 0 ${w} ${h + 10}`} preserveAspectRatio="none" style={{ width: '100%', height: h }}>
+        <defs>
+          <linearGradient id={`ag_${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor={color} stopOpacity="0.35"/>
+            <stop offset="95%" stopColor={color} stopOpacity="0.02"/>
+          </linearGradient>
+        </defs>
+        <path d={areaD} fill={`url(#ag_${dataKey})`}/>
+        <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
+        {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="3" fill={color}/>)}
+      </svg>
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 4px' }}>
+        {data.map((d, i) => (
+          <span key={i} style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>{d.date || d.month || ''}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PieChartSimple({ data, size = 140, innerRadius = 0 }) {
+  if (!data || !data.length) return null;
+  const total = data.reduce((s, d) => s + (d.value || 0), 0);
+  if (total === 0) return null;
+  const cx = size / 2, cy = size / 2, r = size / 2 - 6, ir = innerRadius;
+  let angle = -Math.PI / 2;
+  const slices = data.map(d => {
+    const sweep = (d.value / total) * 2 * Math.PI;
+    const a1 = angle, a2 = angle + sweep;
+    angle = a2;
+    const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+    const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
+    const large = sweep > Math.PI ? 1 : 0;
+    let path;
+    if (ir > 0) {
+      const ix1 = cx + ir * Math.cos(a1), iy1 = cy + ir * Math.sin(a1);
+      const ix2 = cx + ir * Math.cos(a2), iy2 = cy + ir * Math.sin(a2);
+      path = `M${ix1.toFixed(2)},${iy1.toFixed(2)} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large} 1 ${x2.toFixed(2)},${y2.toFixed(2)} L${ix2.toFixed(2)},${iy2.toFixed(2)} A${ir},${ir} 0 ${large} 0 ${ix1.toFixed(2)},${iy1.toFixed(2)} Z`;
+    } else {
+      path = `M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z`;
+    }
+    return { path, color: d.color || '#888', name: d.name, value: d.value };
+  });
+  return (
+    <svg width={size} height={size} style={{ overflow: 'visible' }}>
+      {slices.map((s, i) => (
+        <path key={i} d={s.path} fill={s.color} stroke="var(--surface)" strokeWidth="2" opacity="0.92">
+          <title>{s.name}: {s.value?.toLocaleString()}</title>
+        </path>
+      ))}
+    </svg>
+  );
+}
+
+// Shim the Recharts component names used in the app to our replacements
+function ResponsiveContainer({ children, width, height }) {
+  return <div style={{ width: '100%', height }}>{children}</div>;
+}
+function BarChart({ data, children, margin }) {
+  // extract bar definitions from children
+  const bars = [];
+  const xKey = [];
+  React.Children.forEach(children, c => {
+    if (!c) return;
+    if (c.type && c.type.name === 'Bar') bars.push(c.props);
+    if (c.type && c.type.name === 'XAxis') xKey.push(c.props.dataKey);
+  });
+  return <BarChartSimple data={data} keys={bars.map(b=>b.dataKey)} colors={bars.map(b=>b.fill||'#888')} height={200}/>;
+}
+function Bar({ dataKey, fill }) { return null; }
+function AreaChart({ data, children, margin }) {
+  const areas = [];
+  React.Children.forEach(children, c => {
+    if (c && c.type && c.type.name === 'Area') areas.push(c.props);
+  });
+  const a = areas[0];
+  return a ? <AreaChartSimple data={data} dataKey={a.dataKey} color={a.stroke||'var(--emerald)'} height={180}/> : null;
+}
+function Area({ dataKey, stroke }) { return null; }
+function PieChart({ children }) {
+  let pieProps = null;
+  React.Children.forEach(children, c => {
+    if (c && c.type && c.type.name === 'Pie') pieProps = c.props;
+  });
+  if (!pieProps) return null;
+  const innerR = pieProps.innerRadius || 0;
+  const outerR = pieProps.outerRadius || 70;
+  const size = outerR * 2 + 16;
+  const cells = React.Children.toArray(pieProps.children);
+  const data = (pieProps.data || []).map((d, i) => ({
+    ...d, color: cells[i]?.props?.fill || '#888'
+  }));
+  return <div style={{display:'flex',justifyContent:'center'}}><PieChartSimple data={data} size={size} innerRadius={innerR}/></div>;
+}
+function Pie({ data, children }) { return null; }
+function Cell({ fill }) { return null; }
+function XAxis() { return null; }
+function YAxis() { return null; }
+function CartesianGrid() { return null; }
+function Tooltip() { return null; }
+function Legend() { return null; }
+function LineChart({ data, children }) { return null; }
+function Line() { return null; }
+// ── END CHART REPLACEMENTS ───────────────────────────────────────────────────
+
 
 // ─── MOCK DATA ──────────────────────────────────────────────────────────────
 const fmt = (n, cur = "₹") => `${cur}${n >= 1e7 ? (n / 1e7).toFixed(2) + "Cr" : n >= 1e5 ? (n / 1e5).toFixed(2) + "L" : n.toLocaleString("en-IN")}`;
@@ -1687,10 +1811,10 @@ function App() {
 }
 
 
-      // Mount the app
-      const root = ReactDOM.createRoot(document.getElementById('root'));
-      root.render(React.createElement(App));
-      document.getElementById('loading').style.display = 'none';
-    </script>
-  </body>
+    const container = document.getElementById('root');
+    const root = ReactDOM.createRoot(container);
+    root.render(React.createElement(App));
+    document.getElementById('splash').remove();
+  </script>
+</body>
 </html>
